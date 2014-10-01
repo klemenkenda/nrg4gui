@@ -1,0 +1,20 @@
+RewriteEngine on
+Options +FollowSymlinks
+RewriteBase /
+
+RewriteRule ^en/realestate/(.*)/(.*)$ /index.php?lang=en&id=6&rid=$1
+RewriteRule ^sl/nepremicnina/(.*)/(.*)$ /index.php?lang=sl&id=6&rid=$1
+RewriteRule ^hr/nekretnina/(.*)/(.*)$ /index.php?lang=cr&id=6&rid=$1
+
+RewriteRule ^en/(.*)\.html&(.*)$ /index.php?lang=en&vfile=$1&$2
+RewriteRule ^en/(.*)\.html$ /index.php?lang=en&vfile=$1
+
+RewriteRule ^sl/(.*)\.html&(.*)$ /index.php?lang=sl&vfile=$1&$2
+RewriteRule ^sl/(.*)\.html$ /index.php?lang=sl&vfile=$1
+
+RewriteRule ^hr/(.*)\.html&(.*)$ /index.php?lang=cr&vfile=$1&$2
+RewriteRule ^hr/(.*)\.html$ /index.php?lang=cr&vfile=$1
+
+RewriteRule ^en/(.*)$ /index.php?lang=en&id=$1
+RewriteRule ^sl/(.*)$ /index.php?lang=sl&id=$1
+RewriteRule ^hr/(.*)$ /index.php?lang=cr&id=$1

@@ -1,0 +1,570 @@
+<?PHP
+//---------------------------------------------------------------------
+// FILE: plugins.inc.php
+// AUTHOR: Klemen Kenda
+// DESCRIPTION: plugins file
+// DATE: 15/04/2010
+// HISTORY:
+//---------------------------------------------------------------------
+
+// includes of other plugins in the end of file
+
+//---------------------------------------------------------------------
+// PLUGIN: Menu
+//---------------------------------------------------------------------
+
+function getLangPageLink($lang, $lang_suffix, $page) {
+  // ce page v drugem jeziku ni prazen
+	if ($page["pa_title$lang_suffix"] != "") {
+    if ($page["pa_uri$lang_suffix"] != "") $link = "/$lang/" . $page["pa_uri$lang_suffix"] . ".html";
+   	  else $link = "/$lang/" . $page["id"];
+  } else {
+	  $SQL = "SELECT * FROM pages WHERE id = " . $page["pa_pid"];
+		$result = mysql_query($SQL);
+		$page = mysql_fetch_array($result);
+		$link = getLangPageLink($lang, $lang_suffix, $page);
+	}
+		
+	return $link;	
+}
+
+function getLangLink($lang, $page, $nid, $rid, $aid, $p) {
+  // handle default language
+  if ($lang != "sl") $lang_suffix = "_" . $lang;
+	  else $lang_suffix = "";	
+		
+  $uri["news"]["sl"] = "novice";
+	$uri["news"]["en"] = "news";
+
+ 	$link = getLangPageLink($lang, $lang_suffix, $page);
+			
+	// ce smo v novici
+  if (isset($nid)) {	  
+		$SQL = "SELECT * FROM news WHERE id = $nid";
+		$result = mysql_query($SQL);
+		$line = mysql_fetch_array($result);
+		// ce je nastavljen novi naslov, vrnemo link z naslovom, sicer obicajni link na page z vsemi novicami
+		if ($line["ne_title$lang_suffix"] != "") $link = "/$lang/" . $uri["news"][$lang] . "/" . $nid . "/" . $p . "/" . getNewsLink($line["ne_title$lang_suffix"]);		
+	} elseif (isset($rid)) {
+		$SQL = "SELECT * FROM clientreferences WHERE id = $rid";
+		$result = mysql_query($SQL);
+		$line = mysql_fetch_array($result);
+		// ce je nastavljen novi naslov, vrnemo link z naslovom, sicer obicajni link na page z vsemi novicami
+		if ($line["re_title$lang_suffix"] != "") $link = "/$lang/" . $uri["references"][$lang] . "/" . $rid . "/" . $p . "/" . getNewsLink($line["re_title$lang_suffix"]);			  
+	} elseif (isset($aid)) {
+		$SQL = "SELECT * FROM articles WHERE id = $aid";
+		$result = mysql_query($SQL);
+		$line = mysql_fetch_array($result);
+		// ce je nastavljen novi naslov, vrnemo link z naslovom, sicer obicajni link na page z vsemi novicami
+		if ($line["ar_title$lang_suffix"] != "") $link = "/$lang/" . $uri["articles"][$lang] . "/" . $aid . "/" . $p . "/" . getNewsLink($line["ar_title$lang_suffix"]);			  	
+	}
+		
+	return $link;
+}
+
+function getLink($page) {
+  global $lang;
+	global $lang_suffix;
+	
+	if ($page["pa_uri$lang_suffix"] != "") $link = "/$lang/" . $page["pa_uri$lang_suffix"] . ".html";
+	  else $link = "/$lang/" . $page["id"];
+		
+	return $link;
+}
+
+function pluginMenu() {
+	global $page;
+	global $lang;
+	global $id;
+	
+	$SQL = "SELECT * FROM pages WHERE pa_title <> '' AND pa_pid = " . getAbel($page["id"]) . " AND id <> 1 AND pa_weight < 10000 ORDER BY pa_weight";
+	$result = mysql_query($SQL);			
+	
+	if ($page["id"] == getAbel($page["id"])) $active = "active"; else $active = "";
+	$link = "index.html";
+	$icon = '<i class="fa fa-dashboard"></i>';
+	$HTML .= "<li class=\"$active\"><a href=\"$link\">$icon<span>Dashboard</span></a></li>";
+	
+	
+	while ($line = mysql_fetch_array($result)) {
+	  $HTML .= subMenu($line, 1);
+	}
+	
+	return $HTML;
+}
+
+function subMenu($page, $level = 2) {
+  global $lang_suffix;
+  global $id;
+	
+  $SQL = "SELECT * FROM pages WHERE pa_pid = " . $page["id"] . " AND pa_weight < 10000 ORDER BY pa_weight";	
+  $result = mysql_query($SQL); 
+
+  $link = getLink($page);
+  
+  // icons
+  if ($level == 1) {
+    switch($page["pa_title"]) {
+    	case "Alarms": $icon = '<i class="fa fa-bell-o"></i>'; break;
+    	case "Map":  $icon = '<i class="fa fa-map-marker"></i>'; break;
+    	case "Exploratory Analysis":  $icon = '<i class="fa fa-th"></i>'; break;
+    	case "Predefined Visualizations":  $icon = '<i class="fa fa-area-chart"></i>'; break;
+    	case "State Graph": $icon = '<i class="fa fa-sitemap"></i>'; break;
+    	case "Custom Visualizations": $icon = '<i class="fa fa-bar-chart"></i>'; break;
+    	default: $icon = '<i class="fa fa-calculator"></i>'; break;
+    		
+    }
+  } else $icon = "";
+  
+	if (mysql_num_rows($result) > 0) {
+		$icon .= '<b class="caret pull-right"></b>';
+		if (getEnos($page["id"]) == getEnos($id)) $active = "active"; 
+		else $active = "";
+		$HTML .= "<li class=\"has-sub $active\"><a href=\"javascript:;\">$icon<span>" . $page["pa_title$lang_suffix"] . "</span></a>";
+		$HTML .= "<ul class=\"sub-menu\">";
+   	
+		while ($line = mysql_fetch_array($result)) {
+		  $HTML .= subMenu($line, $level + 1);
+		}
+
+		$HTML .= "</ul>";
+		$HTML .= "</li>";
+	} else {
+		if ($id == $page["id"]) $active = "active";
+		else $active = "";
+	  $HTML .= "<li class=\"$active\"><a href=\"$link\">$icon<span>" . $page["pa_title$lang_suffix"] . "</span></a></li>";
+	}
+	
+	return $HTML;
+}
+
+function fillTemplate($template, $args) {
+  foreach($args as $key => $val) {
+	  $template = str_replace("%" . $key . "%", $val, $template); 
+	}	
+	
+  return $template;
+}
+
+// -----------------------------------------------
+// PLUGIN: Exposed
+// DESCRIPTION: Izpise Exposed
+// -----------------------------------------------
+function pluginExposed() {
+  $template = loadTemplate("exposed/exposedfront.html");
+	
+	return $template;
+}
+// -----------------------------------------------
+// PLUGIN: MembersFront
+// DESCRIPTION: Izpise tagcloud
+// -----------------------------------------------
+
+function pluginMembersCloud() {
+  $template = loadTemplate("members/membersfront.html");
+	
+	return $template;
+}
+
+// -----------------------------------------------
+// PLUGIN: MembersXML
+// DESCRIPTION: Izpise tagcloud
+// -----------------------------------------------
+
+function pluginMembersXML() {
+  $SQL = "SELECT * FROM members";
+	$result = mysql_query($SQL);
+	
+	$XML = "﻿<tags>\n";
+	
+	while ($line = mysql_fetch_array($result)) {
+	  $fsize = round(150 / strlen($line["me_name"]) + 3);
+	  $XML .= "  <a href=\"" . $line["me_link"] . "\" target=\"_new\" style=\"font-size: " . $fsize . "pt;\">" . $line["me_name"] . "</a>\n";
+	}
+	$XML .= "</tags>\n";
+	
+	return $XML;
+}
+
+// -----------------------------------------------
+// PLUGIN: Sponsors
+// DESCRIPTION: Izpise sponzorje
+// -----------------------------------------------
+
+function pluginSponsors() {
+  $template = loadTemplate("sponsors/sponsors.html");
+	
+	return $template;
+}
+
+//---------------------------------------------------------------------
+// PLUGIN: ENews
+//---------------------------------------------------------------------
+
+function pluginENews() {
+  $template = loadTemplate("enews/enews.html");
+	
+	return $template;
+}
+
+//---------------------------------------------------------------------
+// PLUGIN: MSSPages
+//---------------------------------------------------------------------
+
+function pluginMSSPages() {
+  $template = loadTemplate("msspages/msspages.html");
+	
+	return $template;
+}
+
+//---------------------------------------------------------------------
+// PLUGIN: MSSPages
+//---------------------------------------------------------------------
+
+function pluginYFJ() {
+  $template = loadTemplate("yfj/yfj.html");
+	
+	return $template;
+}
+
+// -----------------------------------------------
+// PLUGIN: RandomPhoto
+// DESCRIPTION: Izpise nakljucno fotografijo
+// -----------------------------------------------
+
+function pluginRandomPhoto() {
+  $template = loadTemplate("randomphoto/randomphoto.html");
+  
+	$SQL = "SELECT * FROM randomphotos ORDER BY rand()";
+	$result = mysql_query($SQL);
+	
+	$line = mysql_fetch_array($result);
+	$id = $line["id"];
+	
+	$HTML = fillTemplate($template, array( 	  	
+			"id" => $id
+		)
+	);  
+	return $HTML;
+}
+
+
+// -----------------------------------------------
+// PLUGIN: SubscribeMailing
+// DESCRIPTION: Naro�i na mailing listo
+// -----------------------------------------------
+
+function isValidEmail($email){
+  return eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", $email);
+}
+
+function pluginSubscribeMailing() {
+  global $lang; 
+	global $action;
+	global $email;
+	global $list;
+	
+  ini_set("allow_url_fopen", "1");
+  ini_set("display_errors", "0");
+			
+	if (isValidEmail($email)) {
+
+  	$office_mail = "pisarna@mss.si";
+    if ($lang == "en") {
+  		$subject = "Prijava na mailing listo (WEB - anglescina)";
+  	} else {
+  	  $subject = "Prijava na mailing listo (WEB)";
+  	}
+  	
+  	$content = "Uporabnik $email se je prijavil na mailing listo.";
+    $headers = 'From: pisarna@mss.si' . "\r\n" .
+       'Reply-To: pisarna@mss.si' . "\r\n" .
+       'X-Mailer: PHP/' . phpversion();
+    
+    
+    if (
+  	    (isset($action)) && 
+  	    ($action == "subscribe")
+  		 ) {
+      mail($office_mail, $subject, $content, $headers);
+    }
+  	
+  	if ($lang == "en") {
+  	  $HTML .= "Subscription successful!<br><br>";
+  	} else {
+  	  $HTML .= "Prijava uspešna!<br><br>";	
+  	}
+  
+	  /*
+  	if ($lang != "en") {
+    	if ((isset($action)) && ($action == "subscribe")) {
+    
+        $my_pass = "mss" . rand(100,1);
+  			$urlname = "http://213.172.226.10/mailman/subscribe/$list?email=$email&pw=$my_pass&pw-conf=$my_pass&digest=0&email_button=Subscribe";						
+  			
+  			// echo $urlname;
+    
+        $file = fopen($urlname, "r");
+    	
+        if (!$file) {
+          $HTML .= "<p>Ne morem odpreti programa.<br>Obvestite <a href=\"mailto:bubi\@rutka.net\">skrbnika strani</a>\n";
+          return $HTML;
+        }
+        while (!feof($file)) {
+          $line = fgets($file, 8192);
+    	    $newline = str_replace("../", "http://213.172.226.10/mailman/", $line);
+    			$newline = str_replace("/icons/", "http://213.172.226.10/icons/", $newline);
+    			$newline = str_replace("Informator Subscription results", "<br>Rezultat prijave na obvestila", $newline);
+    			$newline = str_replace("<table WIDTH=\"100%\" BORDER=\"0\">", "<!--", $newline);
+    			$newline = str_replace("</table>","!-->", $newline);
+      		$newline = str_replace("<h1>", "<b>", $newline);
+     		  $newline = str_replace("</h1>", "</b><br><br>", $newline);
+     		  $newline = str_replace("<hr>", "<hr style=\"height: 1px\" color=\"black\">", $newline);
+    		  $newline = str_replace("<a href", "<a target=\"_new\" href", $newline);
+    		  $newline = str_replace("</body>", "</body>", $newline);
+     		  $newline = str_replace("Your subscription request has been received, and will soon be acted upon.", "Za uspešno prijavo na mailing listo je zaradi možnih zlorab potrebno potrdilo s tvojega e-naslova. Navodila so ti bila že poslana po e-pošti na naslov.<br><br>" . "Prosimo, bodite pozorni na to, da boste na listo prijavljeni šele po uspešni potrditvi!<br><br>", $newline);
+  				$newline = str_replace("Depending on the configuration of this mailing list, your subscription request", "", $newline);
+  				$newline = str_replace("may have to be first confirmed by you via email, or approved by the list", "", $newline);
+  				$newline = str_replace("moderator.  If confirmation is required, you will soon get a confirmation", "", $newline);
+  				$newline = str_replace("email which contains further instructions.", "", $newline); 
+     		  $newline = str_replace("Please note your subscription will not start until you confirm your subscription.", "Prosimo, bodite pozorni na to, da boste na listo prijavljeni �ele po uspe�ni potrditvi!<br><br>", $newline);
+    			$newline = str_replace("<hr ", "<!-- ", $newline);
+  				$newline = str_replace("mailing lists</a><p>", "-->", $newline);					 		 		 		 		 
+          $HTML .= $line;
+        }
+        fclose($file); 
+      };
+  	};
+		*/
+	} else {
+  	if ($lang == "en") {
+  	  $HTML .= "E-mail address is not valid!";
+  	} else {
+  	  $HTML .= "E-naslov ni pravilen!";	
+  	}	  
+	} 
+	
+	return $HTML;
+}
+
+// -----------------------------------------------
+// PLUGIN: PrintJS
+// DESCRIPTION: Izpise JS za print
+// -----------------------------------------------
+function pluginPrintJS() {
+	foreach ($_GET as $key => $val) {
+	  $parameters .= "&";
+		$parameters .= $key . "=" . $val;	  
+	};
+	
+	foreach ($_POST as $key => $val) {	  
+		$parameters .= "&";
+		$parameters .= $key . "=" . $val;	  
+	};
+
+ 
+  $JS = <<<EOF
+  function printWindow(){
+    window.open("/index.php?print=1$parameters","print", "width=620,height=550,location=no,menubar=no,directories=no,toolbar=no,scrollbars=yes,resizable=no,status=no");
+  }
+EOF;
+return $JS;
+}
+
+
+// -----------------------------------------------
+// PLUGIN: SiteMap
+// DESCRIPTION: Izpise sitemap
+// -----------------------------------------------
+
+function sitemapRecursion($pid) {
+  global $lang;
+	global $lang_suffix;
+	
+  $SQL = "SELECT * FROM pages WHERE pa_title$lang_suffix <> '' AND pa_pid = $pid AND id <> 1 ORDER BY pa_weight";
+  $result = mysql_query($SQL);
+
+	$i = 0;
+	while($line = mysql_fetch_array($result)) {
+    $i++;
+		if ($pid == 1) {
+		  $b = "<b>";
+			$nb = "</b>";
+		} else {
+		  $b = ""; 
+			$nb = "";
+		}
+		$link = getLangPageLink($lang, $lang_suffix, $line);
+		$wholelink = "<a href=\"$link\">";
+		$nwholelink = "</a>";
+		if (($line["pa_content$lang_suffix"] == "") && ($line["pa_plugin1"] == "") && ($line["pa_plugin2"] == "") && ($line["pa_plugin3"] == "")) {
+		  $wholelink = "";
+			$nwholelink = "";
+		}
+  	$lsitemap .= "<li>$b$wholelink" . $line["pa_title$lang_suffix"] . "$nb$nwholelink";					
+	  if ($line["id"] != $pid) $lsitemap .= sitemapRecursion($line["id"]);			
+		$lsitemap .= "</li>\n";					
+	}
+
+	if ($i > 0) {
+  	return "<ul class=\"ul-blue\">" . $lsitemap . "</ul>";
+	} else {
+	  return "";
+	}						
+}
+
+function pluginSitemap() {
+  global $lang;
+  $start = 1;
+	if ($lang == "en") $start = 74;
+	//$sitemap = "<br>";		
+	$sitemap .= sitemapRecursion($start);		
+  return $sitemap;
+}
+
+// -----------------------------------------------
+// PLUGIN: Breadcrumb
+// DESCRIPTION: Doda breadcrumb
+// -----------------------------------------------
+
+function breadCrumb($id, $crumb) {
+  global $lang_suffix;
+	global $lang;
+	global $breadcrumb_next;
+	
+	if ($id == 1) return "<a href=\"/$lang/index.html\">Sinergise</a>" . $crumb;	
+	
+	$SQL = "SELECT * FROM pages WHERE id = $id";
+	$result = mysql_query($SQL);
+	$line = mysql_fetch_array($result);
+	
+ 	$link_before = "<a href=\"" . getLink($line) . "\">";
+	$link_after = "</a>";	
+	
+	$crumb = breadCrumb($line["pa_pid"], $breadcrumb_next . $link_before . $line["pa_title$lang_suffix"] . $link_after . $crumb);	
+	return $crumb;		
+}
+
+function pluginBreadcrumb() {
+  global $page;
+	global $lang_suffix;
+	global $breadcrumb_next;
+	
+	$breadcrumb_next = loadTemplate("breadcrumb/next.html");
+	
+	return loadTemplate("breadcrumb/intro.html") . breadCrumb($page["id"], $crumb);	
+}
+
+// -----------------------------------------------
+// PLUGIN: TranslateJS
+// DESCRIPTION: Doda Google JS API za prevajanje v head
+// -----------------------------------------------
+
+function pluginTranslateJS() {
+  global $page;
+	global $lang;
+	
+	$HTML = <<<EOJS
+	 <script type="text/javascript" src="http://www.google.com/jsapi">
+   </script>
+   <script type="text/javascript">
+    google.load("language", "1");
+
+    function initialize() {
+      var text = document.getElementById("div-content").innerHTML;
+      google.language.detect(text, function(result) {
+        if (!result.error && result.language) {
+          google.language.translate(text, result.language, "$lang",
+                                    function(result) {
+            var translated = document.getElementById("div-content");
+            if (result.translation) {
+              translated.innerHTML = result.translation;
+            }
+          });
+        }
+      });
+    }
+    google.setOnLoadCallback(initialize);
+
+    </script>
+	
+EOJS;
+
+  if (($lang == "sl") || ($lang == "en")) $HTML = "";
+	return $HTML;
+}
+	
+// -----------------------------------------------
+// PLUGIN: Language
+// DESCRIPTION: Naredi lang izbiro na vrhu
+// -----------------------------------------------
+
+function makeLanguage($template, $slo_before, $slo_after, $eng_before, $eng_after) {
+  return fillTemplate($template, 
+	  array(
+		  "slo_before" => $slo_before,
+			"slo_after" => $slo_after,
+		  "eng_before" => $eng_before,
+			"eng_after" => $eng_after
+		)
+	);
+}
+function pluginLanguage() {
+  global $page;
+	global $lang, $lang_suffix;
+	// id novic, referenc ali articla
+	global $nid, $rid, $aid, $p;
+	
+
+  // nalozimo template
+  $template = loadTemplate("language/language.html");
+	
+	// nastavimo vse na prazen niz
+	$slo_before = $slo_after = $eng_before = $eng_after = "";
+	
+	if ($lang == "en") {
+  	// nastavimo linke
+	  $slo_before = "<a href=\"" . getLangLink("sl", $page, $nid, $rid, $aid, $p) . "\">";
+		$slo_after = "</a>";
+	}	elseif ($lang == "sl") {
+	  $eng_before = "<a href=\"" . getLangLink("en", $page, $nid, $rid, $aid, $p) . "\">";
+		$eng_after = "</a>";
+	}
+	
+	// obdelamo in vrnemo template
+	return makeLanguage($template, $slo_before, $slo_after, $eng_before, $eng_after);
+}
+
+// -----------------------------------------------
+// PLUGIN: Lang
+// DESCRIPTION: Vrne kodo jezika
+// -----------------------------------------------
+
+function pluginLang() {
+  global $lang;
+	return $lang;
+}
+					
+// -----------------------------------------------
+// PLUGIN: Keywords
+// DESCRIPTION: Doda klju�ne besede v HTML
+// -----------------------------------------------
+
+function pluginKeywords() {
+  global $page;
+	return $page["pa_keywords"];
+}
+
+// -----------------------------------------------
+// PLUGIN: Description
+// DESCRIPTION: Doda opis v stran
+// -----------------------------------------------
+
+function pluginDescription() {
+  global $page;
+	return $page["pa_description"];
+}
+
+// include ------------------------------------------------------------
+include("plugin.api.inc.php");
+?>

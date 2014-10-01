@@ -1,0 +1,39 @@
+<!-- ================== BEGIN BASE JS ================== -->
+<script src="/assets/plugins/jquery-1.8.2/jquery-1.8.2.min.js"></script>
+<script src="/assets/plugins/jquery-ui-1.10.4/ui/minified/jquery-ui.min.js"></script>
+<script src="/assets/plugins/bootstrap-3.2.0/js/bootstrap.min.js"></script>
+<!--[if lt IE 9]>
+    <script src="assets/crossbrowserjs/html5shiv.js"></script>
+    <script src="assets/crossbrowserjs/respond.min.js"></script>
+    <script src="assets/crossbrowserjs/excanvas.min.js"></script>
+<![endif]-->
+<script src="/assets/plugins/slimscroll/jquery.slimscroll.min.js"></script>
+<script src="/assets/plugins/jquery-cookie/jquery.cookie.js"></script>
+<!-- ================== END BASE JS ================== -->
+
+<script>
+    // start request
+    
+$.ajax({
+    url: '/api/get-sensors',
+  success: loadedSensors
+});
+
+function loadedSensors(data) {
+    // check errors
+    sensors = JSON.parse(data);
+    console.log(sensors.length);
+    for (i = 0; i < sensors.length; i++) {
+        // str = trimUrn(sensors[i].str);
+        str = sensors[i].str;
+        if (str.indexOf("alarm") == -1) $("<option value=\"" + sensors[i].str + "\">" + str + "</option>").appendTo("#ch-sensor");
+    }
+};
+
+
+    
+
+</script>
+
+Sensor:
+<select id="ch-sensor"></select>
